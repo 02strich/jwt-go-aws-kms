@@ -5,8 +5,9 @@ import (
 	"log"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/service/kms"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/kms"
 	"github.com/golang-jwt/jwt/v4"
 
 	"github.com/02strich/jwt-go-aws-kms/v2/jwtkms"
@@ -15,11 +16,8 @@ import (
 const keyID = "aa2f90bf-f09f-42b7-b4f3-2083bd00f9ad"
 
 func main() {
-	awsCfg, err := config.LoadDefaultConfig(context.Background(),
-		config.WithRegion("eu-central-1"))
-	if err != nil {
-		panic(err)
-	}
+	awsCfg := aws.NewConfig().WithRegion("eu-central-1")
+	sess := session.Must(session.NewSession(awsCfg))
 
 	now := time.Now()
 	jwtToken := jwt.NewWithClaims(jwtkms.SigningMethodECDSA256, &jwt.StandardClaims{
@@ -32,7 +30,7 @@ func main() {
 		Subject:   "john.doe@example.com",
 	})
 
-	kmsConfig := jwtkms.NewKMSConfig(kms.NewFromConfig(awsCfg), keyID, false)
+	kmsConfig := jwtkms.NewKMSConfig(kms.New(sess), keyID, false)
 
 	str, err := jwtToken.SignedString(kmsConfig.WithContext(context.Background()))
 	if err != nil {

@@ -3,7 +3,6 @@
 package mockkms
 
 import (
-	"context"
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
@@ -13,8 +12,9 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/aws/aws-sdk-go-v2/service/kms"
-	"github.com/aws/aws-sdk-go-v2/service/kms/types"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/request"
+	"github.com/aws/aws-sdk-go/service/kms"
 	"github.com/google/uuid"
 )
 
@@ -106,13 +106,13 @@ func (k *MockKMS) getKey(id string) (interface{}, error) {
 	return key, nil
 }
 
-func (k *MockKMS) Sign(_ context.Context, in *kms.SignInput, _ ...func(*kms.Options)) (*kms.SignOutput, error) {
+func (k *MockKMS) SignWithContext(ctx aws.Context, in *kms.SignInput, opts ...request.Option) (*kms.SignOutput, error) {
 	key, err := k.getKey(*in.KeyId)
 	if err != nil {
 		return nil, err
 	}
 
-	if in.MessageType != types.MessageTypeDigest {
+	if *in.MessageType != kms.MessageTypeDigest {
 		return nil, fmt.Errorf("unsupported message type: %v", in.MessageType)
 	}
 
@@ -128,14 +128,14 @@ func (k *MockKMS) Sign(_ context.Context, in *kms.SignInput, _ ...func(*kms.Opti
 	}
 }
 
-var ecdsaSigningAlgorithms = map[types.SigningAlgorithmSpec]bool{
-	types.SigningAlgorithmSpecEcdsaSha256: true,
-	types.SigningAlgorithmSpecEcdsaSha384: true,
-	types.SigningAlgorithmSpecEcdsaSha512: true,
+var ecdsaSigningAlgorithms = map[string]bool{
+	kms.SigningAlgorithmSpecEcdsaSha256: true,
+	kms.SigningAlgorithmSpecEcdsaSha384: true,
+	kms.SigningAlgorithmSpecEcdsaSha512: true,
 }
 
 func signECSDA(key *ecdsa.PrivateKey, in *kms.SignInput) (*kms.SignOutput, error) {
-	if !ecdsaSigningAlgorithms[in.SigningAlgorithm] {
+	if !ecdsaSigningAlgorithms[*in.SigningAlgorithm] {
 		return nil, fmt.Errorf("unknowning signing algorithm: %v", in.SigningAlgorithm)
 	}
 
@@ -149,14 +149,14 @@ func signECSDA(key *ecdsa.PrivateKey, in *kms.SignInput) (*kms.SignOutput, error
 	}, nil
 }
 
-var rsaHashAlgorithms = map[types.SigningAlgorithmSpec]crypto.Hash{
-	types.SigningAlgorithmSpecRsassaPkcs1V15Sha256: crypto.SHA256,
-	types.SigningAlgorithmSpecRsassaPkcs1V15Sha384: crypto.SHA384,
-	types.SigningAlgorithmSpecRsassaPkcs1V15Sha512: crypto.SHA512,
+var rsaHashAlgorithms = map[string]crypto.Hash{
+	kms.SigningAlgorithmSpecRsassaPkcs1V15Sha256: crypto.SHA256,
+	kms.SigningAlgorithmSpecRsassaPkcs1V15Sha384: crypto.SHA384,
+	kms.SigningAlgorithmSpecRsassaPkcs1V15Sha512: crypto.SHA512,
 }
 
 func signRSA(key *rsa.PrivateKey, in *kms.SignInput) (*kms.SignOutput, error) {
-	hash, ok := rsaHashAlgorithms[in.SigningAlgorithm]
+	hash, ok := rsaHashAlgorithms[*in.SigningAlgorithm]
 	if !ok {
 		return nil, fmt.Errorf("unknown signing algorithm: %v", in.SigningAlgorithm)
 	}
@@ -171,7 +171,7 @@ func signRSA(key *rsa.PrivateKey, in *kms.SignInput) (*kms.SignOutput, error) {
 	}, nil
 }
 
-func (k *MockKMS) Verify(ctx context.Context, in *kms.VerifyInput, optFns ...func(*kms.Options)) (*kms.VerifyOutput, error) {
+func (k *MockKMS) VerifyWithContext(ctx aws.Context, in *kms.VerifyInput, opts ...request.Option) (*kms.VerifyOutput, error) {
 	key, err := k.getKey(*in.KeyId)
 	if err != nil {
 		return nil, err
@@ -180,7 +180,7 @@ func (k *MockKMS) Verify(ctx context.Context, in *kms.VerifyInput, optFns ...fun
 	switch key := key.(type) {
 	case *ecdsa.PrivateKey:
 		return &kms.VerifyOutput{
-			SignatureValid: ecdsa.VerifyASN1(&key.PublicKey, in.Message, in.Signature),
+			SignatureValid: aws.Bool(ecdsa.VerifyASN1(&key.PublicKey, in.Message, in.Signature)),
 		}, nil
 
 	case *rsa.PrivateKey:
@@ -192,7 +192,7 @@ func (k *MockKMS) Verify(ctx context.Context, in *kms.VerifyInput, optFns ...fun
 }
 
 func verifyRSA(key *rsa.PrivateKey, in *kms.VerifyInput) (*kms.VerifyOutput, error) {
-	hash, ok := rsaHashAlgorithms[in.SigningAlgorithm]
+	hash, ok := rsaHashAlgorithms[*in.SigningAlgorithm]
 	if !ok {
 		return nil, fmt.Errorf("unknown signing algorithm: %v", in.SigningAlgorithm)
 	}
@@ -200,11 +200,11 @@ func verifyRSA(key *rsa.PrivateKey, in *kms.VerifyInput) (*kms.VerifyOutput, err
 	err := rsa.VerifyPKCS1v15(&key.PublicKey, hash, in.Message, in.Signature)
 
 	return &kms.VerifyOutput{
-		SignatureValid: err == nil,
+		SignatureValid: aws.Bool(err == nil),
 	}, nil
 }
 
-func (k *MockKMS) GetPublicKey(_ context.Context, in *kms.GetPublicKeyInput, _ ...func(*kms.Options)) (*kms.GetPublicKeyOutput, error) {
+func (k *MockKMS) GetPublicKeyWithContext(ctx aws.Context, in *kms.GetPublicKeyInput, opts ...request.Option) (*kms.GetPublicKeyOutput, error) {
 	key, err := k.getKey(*in.KeyId)
 	if err != nil {
 		return nil, err

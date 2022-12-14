@@ -3,7 +3,9 @@ package jwtkms
 import (
 	"context"
 
-	"github.com/aws/aws-sdk-go-v2/service/kms"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/request"
+	"github.com/aws/aws-sdk-go/service/kms"
 )
 
 // KMSClient is the subset of `*kms.Client` functionality used when signing and
@@ -11,9 +13,9 @@ import (
 // the full-sized `*kms.Client` object and can substitute their own
 // implementation.
 type KMSClient interface {
-	Sign(ctx context.Context, in *kms.SignInput, optFns ...func(*kms.Options)) (*kms.SignOutput, error)
-	Verify(ctx context.Context, in *kms.VerifyInput, optFns ...func(*kms.Options)) (*kms.VerifyOutput, error)
-	GetPublicKey(ctx context.Context, in *kms.GetPublicKeyInput, optFns ...func(*kms.Options)) (*kms.GetPublicKeyOutput, error)
+	SignWithContext(aws.Context, *kms.SignInput, ...request.Option) (*kms.SignOutput, error)
+	VerifyWithContext(aws.Context, *kms.VerifyInput, ...request.Option) (*kms.VerifyOutput, error)
+	GetPublicKeyWithContext(aws.Context, *kms.GetPublicKeyInput, ...request.Option) (*kms.GetPublicKeyOutput, error)
 }
 
 // Config is a struct to be passed to token signing/verification.

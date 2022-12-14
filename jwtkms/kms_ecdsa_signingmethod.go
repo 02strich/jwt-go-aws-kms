@@ -9,9 +9,8 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/kms"
-	"github.com/aws/aws-sdk-go-v2/service/kms/types"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/kms"
 	"github.com/golang-jwt/jwt/v4"
 )
 
@@ -85,11 +84,11 @@ func (m *ECDSASigningMethod) Sign(signingString string, keyConfig interface{}) (
 	signInput := &kms.SignInput{
 		KeyId:            aws.String(cfg.kmsKeyID),
 		Message:          hashedSigningString,
-		MessageType:      types.MessageTypeDigest,
-		SigningAlgorithm: types.SigningAlgorithmSpec(m.algo),
+		MessageType:      aws.String(kms.MessageTypeDigest),
+		SigningAlgorithm: aws.String(m.algo),
 	}
 
-	signOutput, err := cfg.kmsClient.Sign(cfg.ctx, signInput)
+	signOutput, err := cfg.kmsClient.SignWithContext(cfg.ctx, signInput)
 	if err != nil {
 		return "", fmt.Errorf("signing digest: %w", err)
 	}
@@ -140,17 +139,17 @@ func verifyECDSA(cfg *Config, algo string, hashedSigningString []byte, r *big.In
 	verifyInput := &kms.VerifyInput{
 		KeyId:            aws.String(cfg.kmsKeyID),
 		Message:          hashedSigningString,
-		MessageType:      types.MessageTypeDigest,
+		MessageType:      aws.String(kms.MessageTypeDigest),
 		Signature:        derSig,
-		SigningAlgorithm: types.SigningAlgorithmSpec(algo),
+		SigningAlgorithm: aws.String(algo),
 	}
 
-	verifyOutput, err := cfg.kmsClient.Verify(cfg.ctx, verifyInput)
+	verifyOutput, err := cfg.kmsClient.VerifyWithContext(cfg.ctx, verifyInput)
 	if err != nil {
 		return fmt.Errorf("verifying signature remotely: %w", err)
 	}
 
-	if !verifyOutput.SignatureValid {
+	if verifyOutput.SignatureValid == nil || !*verifyOutput.SignatureValid {
 		return jwt.ErrSignatureInvalid
 	}
 
@@ -162,7 +161,7 @@ func localVerifyECDSA(cfg *Config, hashedSigningString []byte, r *big.Int, s *bi
 
 	cachedKey := pubkeyCache.Get(cfg.kmsKeyID)
 	if cachedKey == nil {
-		getPubKeyOutput, err := cfg.kmsClient.GetPublicKey(cfg.ctx, &kms.GetPublicKeyInput{
+		getPubKeyOutput, err := cfg.kmsClient.GetPublicKeyWithContext(cfg.ctx, &kms.GetPublicKeyInput{
 			KeyId: aws.String(cfg.kmsKeyID),
 		})
 		if err != nil {
