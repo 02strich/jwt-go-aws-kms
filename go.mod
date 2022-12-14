@@ -1,4 +1,4 @@
-module github.com/matelang/jwt-go-aws-kms/v2
+module github.com/02strich/jwt-go-aws-kms/v2
 
 go 1.16
 

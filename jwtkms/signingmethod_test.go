@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/golang-jwt/jwt/v4"
-	"github.com/matelang/jwt-go-aws-kms/v2/jwtkms/internal/mockkms"
+	"github.com/02strich/jwt-go-aws-kms/v2/jwtkms/internal/mockkms"
 )
 
 func TestSigningMethod(t *testing.T) {
